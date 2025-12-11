@@ -1,0 +1,16 @@
+faicons
+shiny
+shinywidgets
+plotly
+pandas
+ridgeplot
+pandas
+ast
+numpy
+re
+collections
+matplotlib
+urllib.parse
+requests
+plotly
+random
