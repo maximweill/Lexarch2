@@ -25,7 +25,6 @@ def get_cvc(word:str)->str:
             structure += "C"
     return structure
 
-
 def hyphenate_each_syllable(
         hyphenation:list[str],
         CV_structure:list[str],
@@ -70,6 +69,21 @@ def consonant_endings(syl: str, CV: str):
 
     return hyphenation, CV_structure
 
+@hyphenation_decorator
+def vR_(syl: str, CV: str):
+    split_points = []
+    for i in range(len(CV) - 2):
+        if CV[i] == "V" and syl[i+1] == "R":
+            if i+2 < len(CV) and (syl[i+2] == "R" or syl[i+2] == "E"):
+                split_points.append(i + 3)
+            else :
+                split_points.append(i + 2)
+    hyphenation = slice_by_indices(syl, split_points)
+    CV_structure = slice_by_indices(CV, split_points)
+
+    return hyphenation, CV_structure
+
+
 valid_dithongs = {
     "AY","EY", #/ei/
     "AI", #/ai/
@@ -83,22 +97,16 @@ valid_dithongs = {
 @hyphenation_decorator
 def vvv_c(syl: str, CV: str):
     split_points = []
-
     for i in range(len(CV) - 3):
         if CV[i] == "V" and CV[i+1] == "V" and CV[i+2] == "V" and CV[i+3] == "C":
-            #print(f"Checking diphthong in syllable: {syl[i:i+3]}")
             if syl[i+1:i+3] in valid_dithongs:
-                #print(f"Found valid diphthong: {syl[i+1:i+3]}")
                 split_points.append(i + 1)
             elif syl[i:i+2] in valid_dithongs:
-                #print(f"Found valid diphthong: {syl[i:i+2]}")
                 split_points.append(i + 2)
-
-
     hyphenation = slice_by_indices(syl, split_points)
     CV_structure = slice_by_indices(CV, split_points)
-
     return hyphenation, CV_structure
+
 @hyphenation_decorator
 def vv_cv(syl: str, CV: str):
     split_points = []
@@ -181,7 +189,7 @@ def doubleConsonantClustersv(syl: str, CV: str):
     for i in range(len(CV) - 3):
         if CV[i] == "V" and CV[i+1] == "C" and CV[i+2] == "C" and CV[i+3] == "V":
             cluster = syl[i+1:i+3]
-            #print(f"Checking cluster: {cluster} in syllable: {syl}")
+            ##print(f"Checking cluster: {cluster} in syllable: {syl}")
             if cluster in valid_double_consonant_clusters:
                 split_points.append(i+1)
             elif cluster not in valid_double_consonant_clusters:
@@ -230,7 +238,7 @@ def closed_compound_word(word: str, words_set:set[str],freq_dict) -> list[str]:
         end = word[i:]
 
         if start in words_set and end in words_set:
-            #print(f"Found compound word: {word} -> {start} + {end}")
+            ##print(f"Found compound word: {word} -> {start} + {end}")
             if freq_dict[start] > 30_000_000 and freq_dict[end] > 30_000_000:  # only accept if both parts are common words
                 return [start, end]
 
@@ -238,9 +246,9 @@ def closed_compound_word(word: str, words_set:set[str],freq_dict) -> list[str]:
 
 def main()->None:
     # Example usage
-    word = "AARDVARK".upper()
+    word = "BASARA".upper()
     hyphenation = hyphenate(word)
-    print(f"Hyphenation for '{word}': {hyphenation}")
+    #print(f"Hyphenation for '{word}': {hyphenation}")
 def main_compound()->None:
     def parse_common_words(path:str)->dict:
         """Return a dict: word -> frequency count"""
@@ -260,8 +268,8 @@ def main_compound()->None:
     freq_dict = parse_common_words("frequency/unigram_freq.csv")
     words = set(freq_dict.keys())
     compound = closed_compound_word("HOMEOWNER", words, freq_dict)
-    print(compound)
+    #print(compound)
 
 if __name__ == "__main__":
-    #main()
-    main_compound()
+    main()
+    #main_compound()
