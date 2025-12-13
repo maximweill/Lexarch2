@@ -10,49 +10,33 @@ import sys
 import random
 import requests
 import urllib.parse
+import json
 
 # Ensure local modules can be imported
 sys.path.append(os.path.dirname(__file__))
 
-try:
-    import spelling_bee_map
-except ImportError:
-    spelling_bee_map = None
-    print("Warning: spelling_bee_map.py not found.")
+import spelling_bee_map
+
 
 from data_processing import load_word_data, load_search_csv
 
 # -----------------------------------------------------------------------------
 # 1. DATA LOADING
 # -----------------------------------------------------------------------------
-words_df = load_word_data("word_dataset_with_difficulties.csv")
-search_df = load_search_csv("search.csv") 
-
+print("Loading data...")
+words_df = load_word_data("lexarchDataProcessing/word_dataset_with_difficulties.csv")
+search_df = load_search_csv("lexarchDataProcessing/search.csv") 
+with open("lexarchDataProcessing/frequency_ratios_data.json","r") as f:
+     frequency_ratios = json.load(f)
 # Generate Word List for Dropdowns
 if not words_df.empty:
     ALL_WORDS = sorted([str(w) for w in words_df['Word'].dropna().unique()])
 else:
     ALL_WORDS = []
+parts_df = pd.read_csv("lexarchDataProcessing/parts_database.csv")
 
-# Create "Parts Database" for Similarity Search (Exploded View)
-def create_parts_database(df):
-    if df.empty: return pd.DataFrame()
-    rows = []
-    for _, row in df.iterrows():
-        word = row['Word']
-        diff = row.get('Spelling Difficulty', 0)
-        freq = row.get('Frequency', 1)
-        # Safe eval
-        syls = ast.literal_eval(row['Syllables']) if isinstance(row['Syllables'], str) else row['Syllables']
-        prons = ast.literal_eval(row['Pronunciation']) if isinstance(row['Pronunciation'], str) else row['Pronunciation']
-        
-        if len(syls) == len(prons):
-            for s, p in zip(syls, prons):
-                rows.append([word, f"{s} ({p})", diff, freq])
-                
-    return pd.DataFrame(rows, columns=['Word', 'Signature', 'Difficulty', 'Frequency'])
+print("Done")
 
-parts_df = create_parts_database(words_df)
 
 # -----------------------------------------------------------------------------
 # 2. HELPER FUNCTIONS
@@ -195,27 +179,6 @@ def server(input, output, session):
         w = input.explore_word().strip().upper()
         return fetch_ngram_data(w) if w else []
 
-    @reactive.Calc
-    @reactive.event(input.btn_explore)
-    def get_frequency_ratios():
-        w = input.explore_word().strip().upper()
-        data = get_word_data()
-        if data is None or parts_df.empty: return []
-        
-        target_freq = data.get('Frequency', 1)
-        target_signatures = [f"{s} ({p})" for s, p in zip(data['Syllables'], data['Pronunciation'])]
-        
-        matched_df = parts_df[parts_df['Signature'].isin(target_signatures)].copy()
-        matched_df = matched_df[matched_df['Word'] != w]
-        
-        if matched_df.empty: return []
-        
-        ratios = []
-        for _, m_row in matched_df.iterrows():
-            n_freq = m_row.get('Frequency', 0)
-            ratios.append(n_freq / target_freq if target_freq > 0 else 0)
-        return ratios
-
     @reactive.Effect
     @reactive.event(input.btn_explore)
     def trigger_search():
@@ -260,7 +223,7 @@ def server(input, output, session):
                 ui.layout_columns(
                     ui.div(ui.h5("Overview"), ui.output_ui("explore_result")),
                     ui.div(
-                        ui.h5("Relevance"), 
+                        ui.h5("Relevance Of Ambiguity in English Errors"), 
                         ui.navset_tab(
                             ui.nav_panel("Distribution", output_widget("relevance_plot", height="350px")), 
                             ui.nav_panel("Proportions", output_widget("pie_plot", height="350px"))
@@ -304,12 +267,12 @@ def server(input, output, session):
     # --- PLOTS ---
     @render_plotly
     def pie_plot():
-        ratios = get_frequency_ratios()
+        ratios = frequency_ratios
         if not ratios: return px.pie(title="No Data")
         
         counts = {
-            "Ratio < 1 (Unlikely)": sum(1 for x in ratios if x <= 1),
-            "Ratio > 1 (Likely)": sum(1 for x in ratios if x > 1)
+            "Ratio = 0 (Irrelevant)": sum(1 for x in ratios if x <= 0),
+            "Ratio > 0 (Relevant)": sum(1 for x in ratios if x > 0)
         }
         fig = px.pie(names=list(counts.keys()), values=list(counts.values()), color_discrete_sequence=["#a5d6a7", "#ef9a9a"])
         
@@ -325,7 +288,7 @@ def server(input, output, session):
 
     @render_plotly
     def relevance_plot():
-        ratios = get_frequency_ratios()
+        ratios = frequency_ratios
         if not ratios: return go.Figure().update_layout(title="No Data")
         
         data = np.array([x for x in ratios if x > 0])
@@ -341,28 +304,83 @@ def server(input, output, session):
             font=dict(color='#1a1a1a', family="Lora, serif"),
             xaxis_title="Freq Ratio", yaxis_title="Probability",
             margin=dict(t=20, b=40, l=40, r=20),
-            xaxis=dict(showgrid=True, gridcolor='#dcd6cc'), yaxis=dict(showgrid=True, gridcolor='#dcd6cc')
+            xaxis=dict(showgrid=True, gridcolor='#dcd6cc'),
+            yaxis=dict(showgrid=True, gridcolor='#dcd6cc'),
+            xaxis_range=[0,40]
         )
         return fig
 
     @render_plotly
     @reactive.event(input.btn_explore)
     def treeplot():
-        if not check_ambiguity_data(): return None 
-        w = input.explore_word().strip().upper()
+        print(input.explore_word())
+        print("Generating treeplot...")
         mode = input.explore_mode()
         data = get_word_data()
-        
-        parent_col = "Syllables" if mode == "Spelling" else "Pronunciation"
-        child_col = "Pronunciation" if mode == "Spelling" else "Syllables"
-        
-        df_parent = search_df[search_df[parent_col].isin(data[parent_col])].copy()
-        df_parent["color"] = df_parent[child_col].apply(lambda x: "teal" if x in data[child_col] else "salmon")
+        print(data)
+        child_col = "Syllables" if mode == "Spelling" else "Pronunciation"
+        parent_col = "Pronunciation" if mode == "Spelling" else "Syllables"
+        # Get parent and child lists
+        p_list, c_list = data[parent_col], data[child_col]
+        print("Generatied data...")
+
+        # Filter data for only the parents we want
+        minimum = min(10_000_000, data['Frequency'])
+        print("Generatied min...")
+        search_df_forshow = search_df[search_df['Frequency'] >= minimum]
+        print("Filtered data...")
+        if search_df_forshow.empty:
+            print("No data after filtering.")
+            search_df_forshow = search_df[search_df['Frequency'] >= 0]
+        print("Generatied forshow...")
+        df_parent = search_df_forshow[search_df_forshow[parent_col].isin(p_list)].copy()
+        if df_parent.empty: return px.treemap(title="Ambiguity data not available for this word, please try another.")
+        print(df_parent.head())
+        print(search_df_forshow[parent_col].isin(p_list))
+        print(p_list)
+        # Compute colors for children
+        df_parent["Ambiguity"] = df_parent.apply(
+        lambda row: 1 if (row[parent_col], row[child_col]) in zip(p_list, c_list) else 0,
+        axis=1
+        )
+
+        # Create a label for children that shows the word itself
         df_parent["label"] = df_parent[child_col]
-        
-        fig = px.treemap(df_parent, path=[parent_col, "label", "Word"], values="Show", color="color", 
-                        color_discrete_map={"teal": "#81C784", "salmon": "#E57373"})
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#1a1a1a', family="Lora, serif"), margin=dict(t=0, l=0, r=0, b=0))
+        subtitle = "  ".join([f"{p} ({c})" for p,c in zip(p_list, c_list)])
+        print("Prepared data...")
+
+        # Create the treemap
+        fig = px.treemap(
+            df_parent,
+            path=[parent_col, "label","Word"],  # Use label for children
+            values="Show",
+            branchvalues="total",
+            color="Ambiguity",
+            color_continuous_scale=["#E57373", "#81C784"],
+            hover_data={
+                child_col: True,
+                "Pronunciation": False,
+                "Syllables": True,
+                "Frequency": True,
+                "Word":True,
+                "Ambiguity": False  # Don't show color in hover
+            },
+            subtitle= subtitle
+        )
+        print("Created figure...")
+        fig.update_traces(
+            textinfo="label",
+            marker_line_color="white",  # border color
+            marker_line_width=0.5         # border thickness
+            )
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#1a1a1a', family="Lora, serif"),
+            margin=dict(t=0, l=0, r=0, b=0),
+            coloraxis_showscale=False
+        )
+        print("Updated layout...")
         return fig
 
     @render_plotly
