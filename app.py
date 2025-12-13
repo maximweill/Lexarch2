@@ -25,7 +25,7 @@ from data_processing import load_word_data, load_search_csv
 # -----------------------------------------------------------------------------
 print("Loading data...")
 words_df = load_word_data("lexarchDataProcessing/word_dataset_with_difficulties.csv")
-search_df = load_search_csv("lexarchDataProcessing/search.csv") 
+search_df = load_search_csv("lexarchDataProcessing/search.csv").dropna()
 with open("lexarchDataProcessing/frequency_ratios_data.json","r") as f:
      frequency_ratios = json.load(f)
 # Generate Word List for Dropdowns
