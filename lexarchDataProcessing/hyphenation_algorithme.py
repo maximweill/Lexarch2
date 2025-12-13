@@ -213,33 +213,55 @@ def slice_by_indices(text: str, indices: list[int]) -> list[str]:
     ends = indices + [len(text)]
     return [text[s:e] for s, e in zip(starts, ends)]
 
-def closed_compound_words(words: list[str]) -> list[list[str]]:
+def closed_compound_words(words: list[str],freq_dict) -> list[list[str]]:
     """Return closed compound words as [start, end], or [word] if none found."""
     result = []
-
+    words_set = set(words)
     for word in words:
-        found = False
-
-        # try all possible splits
-        for i in range(1, len(word)):
-            start = word[:i]
-            end = word[i:]
-
-            if start in words and end in words:
-                result.append([start, end])
-                found = True
-                break
-
-        if not found:
-            result.append([word])
-
+        compound = closed_compound_word(word, words_set, freq_dict)
+        result.append(compound)
     return result
+
+def closed_compound_word(word: str, words_set:set[str],freq_dict) -> list[str]:
+    """Return closed compound word as [start, end], or [word] if none found."""
+    # try all possible splits
+    for i in range(1, len(word)):
+        start = word[:i]
+        end = word[i:]
+
+        if start in words_set and end in words_set:
+            #print(f"Found compound word: {word} -> {start} + {end}")
+            if freq_dict[start] > 30_000_000 and freq_dict[end] > 30_000_000:  # only accept if both parts are common words
+                return [start, end]
+
+    return [word]
 
 def main()->None:
     # Example usage
     word = "AARDVARK".upper()
     hyphenation = hyphenate(word)
-    #print(f"Hyphenation for '{word}': {hyphenation}")
+    print(f"Hyphenation for '{word}': {hyphenation}")
+def main_compound()->None:
+    def parse_common_words(path:str)->dict:
+        """Return a dict: word -> frequency count"""
+        data = {}
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.upper()
+                parts = line.strip().split(",")
+                if len(parts) != 2:
+                    continue
+                word, count = parts
+                if not word.isalpha() or not count.isnumeric():
+                    continue
+                data[word] = int(count)
+        return data
+    
+    freq_dict = parse_common_words("frequency/unigram_freq.csv")
+    words = set(freq_dict.keys())
+    compound = closed_compound_word("HOMEOWNER", words, freq_dict)
+    print(compound)
 
 if __name__ == "__main__":
-    main()
+    #main()
+    main_compound()

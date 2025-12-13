@@ -67,26 +67,31 @@ def main()->None:
     # Build final parallel lists
     # -----------------------------
     final_words = sorted(all_words_set)
-    compound_lists = closed_compound_words(final_words)
-    final_pronunciations = [
-        cmu_dict[word] if len(compound_list) == 1
-        else list(chain.from_iterable(cmu_dict[part] for part in compound_list))
+    compound_lists = closed_compound_words(final_words,freq_dict)
+    final_word_count = [freq_dict[w] for w in final_words]
+    final_pronunciations_syllables = [
+        [" ".join(syllable) for syllable in pronunciation_syllables(cmu_dict[word])] 
+        if len(compound_list) == 1
+        else list(
+            chain.from_iterable(
+                [" ".join(syllable) for syllable in pronunciation_syllables(cmu_dict[part])]
+                for part in compound_list
+                )
+            )
         for word,compound_list in zip(final_words, compound_lists)
     ]
-    final_word_count = [freq_dict[w] for w in final_words]
-    final_pronunciations_syllables = [[" ".join(syllable) for syllable in pronunciation_syllables(pron)] for pron in final_pronunciations]
     final_syllables = [
         hyphenate(word) if len(compound_list) == 1
         else list(chain.from_iterable(hyphenate(part) for part in compound_list))
         for word,compound_list in zip(final_words, compound_lists)
     ]
 
-    
 
     output_path = "final_dataset.csv"
 
     df = pd.DataFrame({
         "Word": final_words,
+        #"Compound": compound_lists,
         "Pronunciation": final_pronunciations_syllables,
         "Syllables": final_syllables,
         "Frequency": final_word_count,
