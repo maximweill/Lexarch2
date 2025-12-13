@@ -1,6 +1,6 @@
 #reruns all the scripts in order
 import gen_data
-gen_data.main()
+#gen_data.main()
 import search_datasets
 search_datasets.main()
 import search2csv

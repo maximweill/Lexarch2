@@ -1,8 +1,7 @@
-import csv
+import pandas as pd
 from phonotactics import pronunciation_syllables
-from correct_hyphenation_DEPRECATED import corrected_hyph, get_closed_compound_words
-import json
-from hyphenation_algorithme import hyphenate
+from hyphenation_algorithme import hyphenate,closed_compound_words
+from itertools import chain
 
 # -----------------------------
 # Parsing functions (return dictionaries)
@@ -58,47 +57,46 @@ def main()->None:
     # -----------------------------
     cmu_dict = parse_cmu("cmu/cmudict-0.7b")
     freq_dict = parse_common_words("frequency/unigram_freq.csv")
-    hyph_dict = {word:hyphenate(word) for word in cmu_dict} #parse_hyphenation("hyphenation/mhyph.txt")
-
     # -----------------------------
     # Keep only words present in all datasets
     # -----------------------------
     acronyms_dict = parse_cmu("cmu/acronym-0.7b")
-    all_words_set = (set(cmu_dict) & set(freq_dict) & set(hyph_dict)) - set(acronyms_dict)
-    closed_compound_words = get_closed_compound_words(hyph_dict, set(all_words_set))
-    all_words_set = all_words_set - set(closed_compound_words)
-
+    all_words_set = (set(cmu_dict) & set(freq_dict)) - set(acronyms_dict)
 
     # -----------------------------
     # Build final parallel lists
     # -----------------------------
     final_words = sorted(all_words_set)
-    final_pronunciations = [cmu_dict[w] for w in final_words]
+    compound_lists = closed_compound_words(final_words)
+    final_pronunciations = [
+        cmu_dict[word] if len(compound_list) == 1
+        else list(chain.from_iterable(cmu_dict[part] for part in compound_list))
+        for word,compound_list in zip(final_words, compound_lists)
+    ]
     final_word_count = [freq_dict[w] for w in final_words]
     final_pronunciations_syllables = [[" ".join(syllable) for syllable in pronunciation_syllables(pron)] for pron in final_pronunciations]
-    final_syllables = [corrected_hyph(hyph_dict[w], pronunciation) for w,pronunciation in zip(final_words,final_pronunciations_syllables)]
+    final_syllables = [
+        hyphenate(word) if len(compound_list) == 1
+        else list(chain.from_iterable(hyphenate(part) for part in compound_list))
+        for word,compound_list in zip(final_words, compound_lists)
+    ]
 
-
-    # -----------------------------
-    # Save datasets
-    # -----------------------------
-    print(f"Removed {len(closed_compound_words)} closed compound words")
-    with open("closed_compound_words.json", "w", encoding="utf-8") as f:
-        json.dump(closed_compound_words, f, indent=2)
     
 
     output_path = "final_dataset.csv"
-    with open(output_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        # Write header
-        writer.writerow(["Word", "Pronunciation", "Syllables", "Frequency"])
-        
-        # Write rows
-        for word, pron_syl, syl, freq in zip(final_words, final_pronunciations_syllables, final_syllables, final_word_count):
-            # Join pronunciation and syllables lists as space-separated strings
-            writer.writerow([word, pron_syl, syl, freq])
 
-    print(f"Saved {len(final_words)} words to {output_path}")
+    df = pd.DataFrame({
+        "Word": final_words,
+        "Pronunciation": final_pronunciations_syllables,
+        "Syllables": final_syllables,
+        "Frequency": final_word_count,
+    })
+    df = df[df["Pronunciation"].apply(len) == df["Syllables"].apply(len)] # remove rows where lengths don't match
+
+    df.to_csv(output_path, index=False, encoding="utf-8")
+
+    print(f"Saved {len(df)} words to {output_path}")
+    print(f"Removed {len(final_words) - len(df)} words from {output_path}")
 
 
 if __name__ == "__main__":

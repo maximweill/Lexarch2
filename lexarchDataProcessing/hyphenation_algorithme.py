@@ -32,6 +32,7 @@ def hyphenate_each_syllable(
         algorithm:Callable[[str, str],tuple[list[str], list[str]]]
         )->tuple[list[str],list[str]]:
     """Hyphenate each syllable based on its CV structure."""
+
     final_hyphenation = []
     final_CV_structure = []
     for syl, CV in zip(hyphenation, CV_structure):
@@ -211,6 +212,28 @@ def slice_by_indices(text: str, indices: list[int]) -> list[str]:
     starts = [0] + indices
     ends = indices + [len(text)]
     return [text[s:e] for s, e in zip(starts, ends)]
+
+def closed_compound_words(words: list[str]) -> list[list[str]]:
+    """Return closed compound words as [start, end], or [word] if none found."""
+    result = []
+
+    for word in words:
+        found = False
+
+        # try all possible splits
+        for i in range(1, len(word)):
+            start = word[:i]
+            end = word[i:]
+
+            if start in words and end in words:
+                result.append([start, end])
+                found = True
+                break
+
+        if not found:
+            result.append([word])
+
+    return result
 
 def main()->None:
     # Example usage
