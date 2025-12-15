@@ -1,5 +1,5 @@
-import pandas as pd
 from data_processing import load_word_data
+import random
 
 df = load_word_data()
 minimum = 5/100
@@ -122,6 +122,26 @@ def generate_test_words(tested_words, minimum, maximum):
     all_words = list(set(all_words))
     
     return saved_dicts, input_words, all_words
+
+def organize_rounds(word_list):
+    """Splits a list of words into game rounds of 5."""
+    if not word_list: return []
+    random.shuffle(word_list)
+    n = len(word_list)
+    if n < 5: return [word_list]
+    
+    rounds = [word_list[i:i + 5] for i in range(0, (n // 5) * 5, 5)]
+    remainder = n % 5
+    
+    if remainder >= 3:
+        rounds.append(word_list[-remainder:])
+    elif remainder > 0:
+        # Distribute extras to previous rounds
+        extras = word_list[-remainder:]
+        for i, word in enumerate(extras):
+            if i < len(rounds): rounds[-(i+1)].append(word)
+            
+    return rounds
 
 
 if __name__ == "__main__":

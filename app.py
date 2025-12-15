@@ -4,109 +4,43 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
-import ast
 import os
 import sys
 import random
-import requests
-import urllib.parse
 import json
+
 
 # Ensure local modules can be imported
 sys.path.append(os.path.dirname(__file__))
 
 import spelling_bee_map
-
-
 from data_processing import load_word_data, load_search_csv
+from ngram import fetch_ngram_data
 
 # -----------------------------------------------------------------------------
 # 1. DATA LOADING
 # -----------------------------------------------------------------------------
-print("Loading data...")
+#print("Loading data...")
 words_df = load_word_data("lexarchDataProcessing/word_dataset_with_difficulties.csv")
 search_df = load_search_csv("lexarchDataProcessing/search.csv").dropna()
 with open("lexarchDataProcessing/frequency_ratios_data.json","r") as f:
      frequency_ratios = json.load(f)
-# Generate Word List for Dropdowns
-if not words_df.empty:
-    ALL_WORDS = sorted([str(w) for w in words_df['Word'].dropna().unique()])
-else:
-    ALL_WORDS = []
+ALL_WORDS = words_df['Word'].tolist()
 parts_df = pd.read_csv("lexarchDataProcessing/parts_database.csv")
 
-print("Done")
+#print("Done")
 
 
 # -----------------------------------------------------------------------------
-# 2. HELPER FUNCTIONS
+# 2. UI CONFIGURATION (THEME)
 # -----------------------------------------------------------------------------
-def fetch_ngram_data(query, start_year=1800, end_year=2019, corpus=26, smoothing=3):
-    """Fetches historical frequency data from Google Books Ngram Viewer."""
-    try:
-        query_encoded = urllib.parse.quote(query)
-        url = f'https://books.google.com/ngrams/json?content={query_encoded}&year_start={start_year}&year_end={end_year}&corpus={corpus}&smoothing={smoothing}'
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.json()
-    except:
-        return []
 
-def organize_rounds(word_list):
-    """Splits a list of words into game rounds of 5."""
-    if not word_list: return []
-    random.shuffle(word_list)
-    n = len(word_list)
-    if n < 5: return [word_list]
-    
-    rounds = [word_list[i:i + 5] for i in range(0, (n // 5) * 5, 5)]
-    remainder = n % 5
-    
-    if remainder >= 3:
-        rounds.append(word_list[-remainder:])
-    elif remainder > 0:
-        # Distribute extras to previous rounds
-        extras = word_list[-remainder:]
-        for i, word in enumerate(extras):
-            if i < len(rounds): rounds[-(i+1)].append(word)
-            
-    return rounds
-
-# -----------------------------------------------------------------------------
-# 3. UI CONFIGURATION (THEME)
-# -----------------------------------------------------------------------------
-custom_css = """
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,600;1,400&display=swap');
-    :root { --bg-color: #fdfbf7; --card-bg: #ffffff; --text-main: #1a1a1a; --text-muted: #595959; --accent: #8b0000; --border-color: #dcd6cc; }
-    body { background-color: var(--bg-color) !important; color: var(--text-main) !important; font-family: 'Lora', serif !important; }
-    h1, h2, h3, h4, h5, h6 { color: var(--text-main) !important; font-family: 'Playfair Display', serif !important; font-weight: 700; letter-spacing: -0.02em; }
-    .card { background-color: var(--card-bg) !important; border: 1px solid var(--border-color) !important; box-shadow: 0 2px 10px rgba(0,0,0,0.03) !important; border-radius: 2px !important; }
-    .card-header { background-color: #f9f7f1 !important; border-bottom: 1px solid var(--border-color) !important; font-family: 'Playfair Display', serif; font-weight: 600; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.1em; }
-    .form-control, .selectize-input { background-color: #ffffff !important; border: 1px solid #b0b0b0 !important; color: var(--text-main) !important; font-family: 'Lora', serif; border-radius: 2px !important; }
-    .btn-primary { background-color: var(--text-main) !important; color: #fff !important; border: none; font-family: 'Playfair Display', serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; border-radius: 2px; }
-    .btn-secondary { background-color: #f0f0f0 !important; border: 1px solid #ccc !important; color: #333 !important; font-family: 'Lora', serif; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.1em; }
-    .bslib-sidebar-layout > .sidebar { background-color: #f4f1ea !important; border-right: 1px solid var(--border-color) !important; }
-    .syllable-chip { background: transparent; color: var(--text-main); padding: 4px 10px; border: 1px solid #dcd6cc; margin: 0 12px 0 0; font-family: 'Georgia', serif; font-weight: bold; display: inline-block; }
-    #results_container { animation: fadeIn 0.8s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-</style>
-"""
-
-tts_script = """
-<script>
-function speakWord(text) {
-    if ('speechSynthesis' in window) {
-        var msg = new SpeechSynthesisUtterance();
-        msg.text = text; msg.lang = 'en-US'; msg.rate = 0.85; 
-        window.speechSynthesis.cancel(); window.speechSynthesis.speak(msg);
-    }
-}
-</script>
-"""
 
 app_ui = ui.page_navbar(
-    ui.head_content(ui.HTML(custom_css + tts_script)),
+    ui.head_content(
+        ui.include_css("www/styles.css"),
+        ui.include_js("www/tts.js")
+    ),
     
     ui.nav_panel("Explore Mode",
         ui.layout_sidebar(
@@ -143,7 +77,7 @@ app_ui = ui.page_navbar(
 )
 
 # -----------------------------------------------------------------------------
-# 4. SERVER LOGIC
+# 3. SERVER LOGIC
 # -----------------------------------------------------------------------------
 def server(input, output, session):
     
@@ -306,38 +240,25 @@ def server(input, output, session):
             margin=dict(t=20, b=40, l=40, r=20),
             xaxis=dict(showgrid=True, gridcolor='#dcd6cc'),
             yaxis=dict(showgrid=True, gridcolor='#dcd6cc'),
-            xaxis_range=[0,40]
+            xaxis_range=[0,10]
         )
         return fig
 
     @render_plotly
     @reactive.event(input.btn_explore)
     def treeplot():
-        print(input.explore_word())
-        print("Generating treeplot...")
+
         mode = input.explore_mode()
         data = get_word_data()
-        print(data)
+
         child_col = "Syllables" if mode == "Spelling" else "Pronunciation"
         parent_col = "Pronunciation" if mode == "Spelling" else "Syllables"
         # Get parent and child lists
         p_list, c_list = data[parent_col], data[child_col]
-        print("Generatied data...")
 
-        # Filter data for only the parents we want
-        minimum = min(10_000_000, data['Frequency'])
-        print("Generatied min...")
-        search_df_forshow = search_df[search_df['Frequency'] >= minimum]
-        print("Filtered data...")
-        if search_df_forshow.empty:
-            print("No data after filtering.")
-            search_df_forshow = search_df[search_df['Frequency'] >= 0]
-        print("Generatied forshow...")
-        df_parent = search_df_forshow[search_df_forshow[parent_col].isin(p_list)].copy()
+        df_parent = search_df[search_df[parent_col].isin(p_list)].copy()
         if df_parent.empty: return px.treemap(title="Ambiguity data not available for this word, please try another.")
-        print(df_parent.head())
-        print(search_df_forshow[parent_col].isin(p_list))
-        print(p_list)
+
         # Compute colors for children
         df_parent["Ambiguity"] = df_parent.apply(
         lambda row: 1 if (row[parent_col], row[child_col]) in zip(p_list, c_list) else 0,
@@ -347,7 +268,7 @@ def server(input, output, session):
         # Create a label for children that shows the word itself
         df_parent["label"] = df_parent[child_col]
         subtitle = "  ".join([f"{p} ({c})" for p,c in zip(p_list, c_list)])
-        print("Prepared data...")
+        #print("Prepared data...")
 
         # Create the treemap
         fig = px.treemap(
@@ -367,7 +288,7 @@ def server(input, output, session):
             },
             subtitle= subtitle
         )
-        print("Created figure...")
+        #print("Created figure...")
         fig.update_traces(
             textinfo="label",
             marker_line_color="white",  # border color
@@ -380,7 +301,7 @@ def server(input, output, session):
             margin=dict(t=0, l=0, r=0, b=0),
             coloraxis_showscale=False
         )
-        print("Updated layout...")
+        #print("Updated layout...")
         return fig
 
     @render_plotly
@@ -395,6 +316,13 @@ def server(input, output, session):
         matched_df = matched_df[matched_df['Word'] != w]
         
         if matched_df.empty: return px.treemap(title="No similar words found.")
+
+        matched_df = (
+            matched_df
+            .sort_values('Frequency', ascending=False)
+            .groupby('Signature', group_keys=False)
+            .head(30)
+        )
 
         fig = px.treemap(matched_df, path=['Signature', 'Word'], values='Frequency', color='Difficulty', color_continuous_scale='RdYlGn_r', range_color=[0, 1])
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#1a1a1a', family="Lora, serif"), margin=dict(t=0, l=0, r=0, b=0))
@@ -526,7 +454,7 @@ def server(input, output, session):
                     if syl_map: mapping[orig_word] = list(syl_map.keys())[0]
 
             word_syllable_map.set(mapping)
-            rounds = organize_rounds(all_words_res)
+            rounds = spelling_bee_map.organize_rounds(all_words_res)
             game_rounds.set(rounds)
             current_round_idx.set(0)
             round_scores.set([])
