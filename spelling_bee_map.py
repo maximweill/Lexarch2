@@ -1,7 +1,7 @@
-from data_processing import load_word_data
 import random
+import pandas as pd
 
-df = load_word_data()
+df = pd.read_parquet("lexarchDataProcessing/word_dataset_with_difficulties.parquet")
 minimum = 5/100
 maximum = 10/100
 

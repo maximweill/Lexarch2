@@ -6,7 +6,6 @@ import pandas as pd
 import numpy as np
 import os
 import sys
-import random
 import pickle
 
 
@@ -14,7 +13,6 @@ import pickle
 sys.path.append(os.path.dirname(__file__))
 
 import spelling_bee_map
-from data_processing import load_word_data, load_search_csv
 from ngram import fetch_ngram_data
 
 
@@ -22,8 +20,8 @@ from ngram import fetch_ngram_data
 # 1. DATA LOADING
 # -----------------------------------------------------------------------------
 #print("Loading data...")
-words_df = load_word_data("lexarchDataProcessing/word_dataset_with_difficulties.parquet")
-search_df = load_search_csv("lexarchDataProcessing/search.parquet").dropna()
+words_df = pd.read_parquet("lexarchDataProcessing/word_dataset_with_difficulties.parquet")
+search_df = pd.read_parquet("lexarchDataProcessing/search.parquet").dropna()
 with open("lexarchDataProcessing/frequency_ratios_data.pkl","rb") as f:
     frequency_ratios = pickle.load(f)
 ALL_WORDS = words_df['Word'].tolist()

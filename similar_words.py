@@ -1,11 +1,9 @@
 import pandas as pd
 
-csv_file = 'lexarchDataProcessing\word_dataset_with_difficulties.parquet'
+file = 'lexarchDataProcessing\word_dataset_with_difficulties.parquet'
+df = pd.read_parquet(file)
 
 def get_similar_words(word, max_results=10):
-    # Load CSV
-    df = pd.read_parquet(csv_file)
-
     # Normalize search case
     df['Word'] = df['Word'].astype(str)
     search_word = word.upper()
