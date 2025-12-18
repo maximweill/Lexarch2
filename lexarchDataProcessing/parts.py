@@ -11,15 +11,16 @@ def create_parts_database(df):
         word = row['Word']
         diff = row.get('Spelling Difficulty', 0)
         freq = row.get('Frequency', 1)
+        show = row.get('Show', 1)
         # Safe eval
         syls = ast.literal_eval(row['Syllables']) if isinstance(row['Syllables'], str) else row['Syllables']
         prons = ast.literal_eval(row['Pronunciation']) if isinstance(row['Pronunciation'], str) else row['Pronunciation']
         
         if len(syls) == len(prons):
             for s, p in zip(syls, prons):
-                rows.append([word, f"{s} ({p})", diff, freq])
+                rows.append([word, f"{s} ({p})", diff, freq, show])
                 
-    return pd.DataFrame(rows, columns=['Word', 'Signature', 'Difficulty', 'Frequency'])
+    return pd.DataFrame(rows, columns=['Word', 'Signature', 'Difficulty', 'Frequency', 'Show'])
 
 def main():
     df = load_word_data("word_dataset_with_difficulties.csv")

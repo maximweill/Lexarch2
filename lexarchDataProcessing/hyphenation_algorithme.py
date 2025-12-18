@@ -1,253 +1,188 @@
-from functools import wraps
-from typing import Callable
+import json
 
 hypenation_algorithms = []
 
-def hyphenate(word:str)->list:
-    CV_structure = [get_cvc(word)]
-    hyphenation = [word]
-    for algorithm in hypenation_algorithms:
-        #print("---")
-        hyphenation, CV_structure = hyphenate_each_syllable(
-            hyphenation, CV_structure, algorithm=algorithm
-        )
+def hyphenate(word:str,pronunciation:list[str])->list:
+    if len(pronunciation) == 1:
+        return [word] # no need to hyphenate single-syllable words
+    hyphenation = hyphenate_with_phoneme_pairs(word,pronunciation)
     return hyphenation
 
-vowels = "AEIOUY"
+def hyphenate_with_phoneme_pairs(word:str,pronunciation:list[str])->list[str]:
+    hyphenation = []
+    remaining_word = word
+    skip_first = 0
+    for cur_s,next_s in zip(pronunciation,pronunciation[1:]):
+        search_text = remaining_word[skip_first:]
+        #print(f"Processing phoneme pair '{cur_s}' -> '{next_s}' in {search_text}")
+        syll_end = cur_s.split(" ")[-1]
+        next_start = next_s.split(" ")[0]
+        combined_indices = find_combined_phoneme_indices(syll_end,next_start,search_text)
+        if combined_indices:
+            min_index = min(ind for ind, _ in combined_indices) # find most early split
+            hyphenation.append(remaining_word[:min_index+skip_first])
+            remaining_word = remaining_word[min_index+skip_first:]
 
-def get_cvc(word:str)->str:
-    """Return the CVC structure of the word as a list."""
-    structure = ""
-    for letter in word:
-        if letter in vowels:
-            structure += "V"
+            if len(next_s.split(" ")) > 1:
+                skip_first = sorted((skip for (ind, skip) in combined_indices if ind == min_index))[0] #use the shortest grapheme length to skip
+            else:
+                skip_first = 0
+            #print(f"> Found grapheme pair for phonemes at index {min_index}, skipping next {skip_first}, hyphenation now: {hyphenation} + {remaining_word}")
         else:
-            structure += "C"
-    return structure
+            search_text = remaining_word # desperate attempt without skipping
+            skip_first = 0
+            #print(f"> No grapheme pair found for phonemes '{cur_s}' -> '{next_s}' in '{search_text}'")
+            if len(cur_s.split(" ")) > 1: # could be an implied phoneme at end
+                syll_end = cur_s.split(" ")[-2] 
+                next_start = next_s.split(" ")[0]
+                #print(f"  Trying implied phoneme at end '{syll_end}' -> '{next_start}'")
+                combined_indices = find_combined_phoneme_indices(syll_end,next_start,search_text)
+                if combined_indices:
+                    #print(f"> Found grapheme pair for implied phonemes at end '{syll_end}' -> '{next_start}'")
+                    min_index = min(ind for ind, _ in combined_indices) # find most early split
+                    hyphenation.append(remaining_word[:min_index+skip_first])
+                    remaining_word = remaining_word[min_index+skip_first:]
 
-def hyphenate_each_syllable(
-        hyphenation:list[str],
-        CV_structure:list[str],
-        algorithm:Callable[[str, str],tuple[list[str], list[str]]]
-        )->tuple[list[str],list[str]]:
-    """Hyphenate each syllable based on its CV structure."""
+                    if len(next_s.split(" ")) > 1:
+                        skip_first = sorted((skip for (ind, skip) in combined_indices if ind == min_index))[0] #use the shortest grapheme length to skip
+                    else:
+                        skip_first = 0 # start and end phoneme are done by the same grapheme
+                else:
+                    if len(next_s.split(" ")) > 1: # could be an implied phoneme at start (Ex: w)
+                        syll_end = cur_s.split(" ")[-1] 
+                        next_start = next_s.split(" ")[1]
+                        #print(f"> Trying implied phonemes at start '{syll_end}' -> '{next_start}'")
+                        combined_indices = find_combined_phoneme_indices(syll_end,next_start,search_text)
+                        if combined_indices:
+                            #print(f"> Found grapheme pair for implied phonemes at end '{syll_end}' -> '{next_start}'")
+                            min_index = min(ind for ind, _ in combined_indices) # find most early split
+                            hyphenation.append(remaining_word[:min_index+skip_first])
+                            remaining_word = remaining_word[min_index+skip_first:]
 
-    final_hyphenation = []
-    final_CV_structure = []
-    for syl, CV in zip(hyphenation, CV_structure):
-        syl_hyph, syl_CV = algorithm(syl, CV)
-        final_hyphenation+=syl_hyph
-        final_CV_structure+=syl_CV
-    return final_hyphenation, final_CV_structure
+                            if len(next_s.split(" ")) > 1:
+                                skip_first = sorted((skip for (ind, skip) in combined_indices if ind == min_index))[0] #use the shortest grapheme length to skip
+                            else:
+                                skip_first = 0 # start and end phoneme are done by the same grapheme
+                        else:
+                            #print("X no implied phoneme found at start, stopping hyphenation")
+                            break
+            else:
+                if len(next_s.split(" ")) > 1: # could be an implied phoneme at start (Ex: w)
+                    syll_end = cur_s.split(" ")[-1] 
+                    next_start = next_s.split(" ")[1]
+                    combined_indices = find_combined_phoneme_indices(syll_end,next_start,search_text)
+                    if combined_indices:
+                        #print(f"> Found grapheme pair for implied phonemes at end '{syll_end}' -> '{next_start}'")
+                        min_index = min(ind for ind, _ in combined_indices) # find most early split
+                        hyphenation.append(remaining_word[:min_index+skip_first])
+                        remaining_word = remaining_word[min_index+skip_first:]
 
-def hyphenation_decorator(func):
-    @wraps(func)
-    def wrapper(word:str, CV:str)->list:
-        hyphenation, CV_structure = func(word, CV)
-        hyphenation = [syl for syl in hyphenation if syl]  # Remove empty strings
-        CV_structure = [syl for syl in CV_structure if syl]  # Remove empty strings
-        #print(f"Applying {func.__name__} on word: {word} with CV: {CV} -> Hyphenation: {hyphenation}, CV_structure: {CV_structure}")
-        return hyphenation, CV_structure
-    hypenation_algorithms.append(wrapper)
-    return wrapper
-
-c_ends = {
-    "SM",
-    "THM"
-}
-@hyphenation_decorator
-def consonant_endings(syl: str, CV: str):
-    split_points = []
-
-    for ends in c_ends:
-        if syl.endswith(ends) and len(syl) > len(ends):
-            split_points.append(len(syl) - len(ends))
-            break
-
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-
-    return hyphenation, CV_structure
-
-@hyphenation_decorator
-def vR_(syl: str, CV: str):
-    split_points = []
-    for i in range(len(CV) - 2):
-        if CV[i] == "V" and syl[i+1] == "R":
-            if i+2 < len(CV) and (syl[i+2] == "R" or syl[i+2] == "E"):
-                split_points.append(i + 3)
-            else :
-                split_points.append(i + 2)
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-
-    return hyphenation, CV_structure
+                        if len(next_s.split(" ")) > 1:
+                            skip_first = sorted((skip for (ind, skip) in combined_indices if ind == min_index))[0] #use the shortest grapheme length to skip
+                        else:
+                            skip_first = 0 # start and end phoneme are done by the same grapheme
+                    else:
+                        #print("X no implied phoneme found at start, stopping hyphenation")
+                        break
 
 
-valid_dithongs = {
-    "AY","EY", #/ei/
-    "AI", #/ai/
-    "OW","OA", #/ou/
-    "OI","OY", #/ɔi/
-    "OU", #/au/,/ʊə/
-    "EE","EA", #/ɪə/
-    "AI","EA", #/eə/
-    "IY","IE", #/i:/
-    }
-@hyphenation_decorator
-def vvv_c(syl: str, CV: str):
-    split_points = []
-    for i in range(len(CV) - 3):
-        if CV[i] == "V" and CV[i+1] == "V" and CV[i+2] == "V" and CV[i+3] == "C":
-            if syl[i+1:i+3] in valid_dithongs:
-                split_points.append(i + 1)
-            elif syl[i:i+2] in valid_dithongs:
-                split_points.append(i + 2)
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-    return hyphenation, CV_structure
+    hyphenation.append(remaining_word)
+    return hyphenation
 
-@hyphenation_decorator
-def vv_cv(syl: str, CV: str):
-    split_points = []
-
-    for i in range(len(CV) - 3):
-        if CV[i] == "V" and CV[i+1] == "V" and CV[i+2] == "C" and CV[i+3] == "V":
-            if syl[i:i+2] not in valid_dithongs:
-                split_points.append(i + 2)
-
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-
-    return hyphenation, CV_structure
+def find_combined_phoneme_indices(syll_end:str, next_start:str, search_text:str)->tuple[list[int], list[int]]:
+    graphemes_end,lengths_end = find_phoneme_indices(syll_end,search_text)
+    end_indices = [ind+length for ind,length in zip(graphemes_end,lengths_end)]
+    graphemes_next_start,lengths_next_start = find_phoneme_indices(next_start,search_text)
+    start_indices = graphemes_next_start
+    combined_indices = [(ind, length) for (ind, length) in zip(start_indices,lengths_next_start) if ind in end_indices]
+    return combined_indices
 
 
-# ignore double consonant clusters that are valid only at start
-#s2c = {"S"+ a for a in "PTKC"} #only valid at start
-c2h = {"CH","SH","TH","PH","WH"}
-valid_double_consonant_clusters = set({
-    "CH","SH","TH","PH","WH",
-    "CK","QU","NG",
-    "BL", "BR",
-    "CL", "CR",
-    "DR",
-    "FL", "FR",
-    "GL", "GR",
-    "PL", "PR",
-    "TR","NC",
-    "CK",
-    })|{a+a for a in "BCFGHKLMNPQRSTVXYZ" 
-    }|{a+"S" for a in "BCFGHKLMNPQRSTVXYZ" 
-    }|c2h
-valid_triple_consonant_clusters = set({
-})|{a + "L" for a in c2h
-    }|{a + "W" for a in c2h
-    }|{a + "J" for a in c2h
-    }|{"S" + a for a in c2h
-    }|{a + "R" for a in valid_double_consonant_clusters}
+with open("phoneme2grapheme.json","r",encoding="utf-8") as f:
+    phoneme2grapheme = json.load(f)  
+def find_phoneme_indices(phoneme:str,word:str)->tuple[list[int], list[int]]:
+    graphemes_indices = []
+    graphemes_lengths = []
+    for grapheme in phoneme2grapheme[phoneme]:
+        indices = [i for i in range(len(word)) if word.startswith(grapheme, i)]
+        if indices:
+            graphemes_indices.extend(indices)
+            graphemes_lengths.extend([len(grapheme)] * len(indices))
 
-@hyphenation_decorator
-def fourConsonantClustersv(syl: str, CV: str):
-    split_points = []
-    # add virtual letters to start to catch initial clusters
-    for i in range(len(CV) - 5):
-        if CV[i] == "V" and CV[i+1] == "C" and CV[i+2] == "C" and CV[i+3] == "C" and CV[i+4] == "C" and CV[i+5] == "V":
-            cluster = syl[i+1:i+5]
-            if cluster[1:] in valid_triple_consonant_clusters:
-                split_points.append(i + 2)
+    return graphemes_indices, graphemes_lengths
 
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-
-    return hyphenation, CV_structure
-
-@hyphenation_decorator
-def threeConsonantClustersv(syl: str, CV: str):
-    split_points = []
-    # add virtual letters to start to catch initial clusters
-    for i in range(len(CV) - 4):
-        if CV[i] == "V" and CV[i+1] == "C" and CV[i+2] == "C" and CV[i+3] == "C" and CV[i+4] == "V":
-            cluster = syl[i+1:i+4]
-            if cluster in valid_triple_consonant_clusters:
-                split_points.append(i+1)
-            elif cluster[1:] in valid_double_consonant_clusters:
-                split_points.append(i + 2)
-            elif cluster[:2] in valid_double_consonant_clusters:
-                split_points.append(i + 3)
-            elif "R" in cluster:
-                split_points.append(i + cluster.index("R") + 2)
-
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-
-    return hyphenation, CV_structure
-
-@hyphenation_decorator
-def doubleConsonantClustersv(syl: str, CV: str):
-    split_points = []
-    # add virtual letters to start to catch initial clusters
-    for i in range(len(CV) - 3):
-        if CV[i] == "V" and CV[i+1] == "C" and CV[i+2] == "C" and CV[i+3] == "V":
-            cluster = syl[i+1:i+3]
-            ##print(f"Checking cluster: {cluster} in syllable: {syl}")
-            if cluster in valid_double_consonant_clusters:
-                split_points.append(i+1)
-            elif cluster not in valid_double_consonant_clusters:
-                split_points.append(i+2)
-            elif "R" in cluster:
-                split_points.append(i + cluster.index("R"))
-
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-
-    return hyphenation, CV_structure
-
-@hyphenation_decorator
-def v_cv(syl: str, CV: str):
-    split_points = []
-
-    for i in range(len(CV) - 2):
-        if CV[i] == "V" and CV[i+1] == "C" and CV[i+2] == "V":
-            if not(syl[i+2] == "E" and i+2 == len(syl)-1):  # E ending exception
-                split_points.append(i + 1)
-
-    hyphenation = slice_by_indices(syl, split_points)
-    CV_structure = slice_by_indices(CV, split_points)
-
-    return hyphenation, CV_structure
-
-def slice_by_indices(text: str, indices: list[int]) -> list[str]:
-    starts = [0] + indices
-    ends = indices + [len(text)]
-    return [text[s:e] for s, e in zip(starts, ends)]
-
-def closed_compound_words(words: list[str],freq_dict) -> list[list[str]]:
-    """Return closed compound words as [start, end], or [word] if none found."""
-    result = []
+def closed_compound_words(words: list[str], freq_dict) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Return closed compound words as fully expanded components, or [word] if none found."""
     words_set = set(words)
-    for word in words:
-        compound = closed_compound_word(word, words_set, freq_dict)
-        result.append(compound)
-    return result
 
+    # Step 1: compute direct compounds
+    direct = {}
+    for word in words:
+        direct[word] = closed_compound_word(word, words_set, freq_dict)
+
+    expanded = {}
+    singles = {}
+
+    def expand(word, seen=None):
+        if seen is None:
+            seen = set()
+        if word in seen:
+            return [word]  # safety against cycles
+        if word in expanded:
+            return expanded[word]
+
+        seen.add(word)
+        parts = direct[word]
+
+        if len(parts) == 1:
+            result = parts
+        else:
+            result = []
+            for part in parts:
+                if part in direct:
+                    result.extend(expand(part, seen))
+                else:
+                    result.append(part)
+
+        expanded[word] = result
+        return result
+
+    # Step 2: expand everything
+    for word in words:
+        result = expand(word)
+        if len(result) == 1:
+            singles[word] = result
+        else:
+            expanded[word] = result
+
+    compounds = {w: expanded[w] for w in expanded if len(expanded[w]) > 1}
+    return singles, compounds
+
+
+suffixes_that_are_words = { #lol they are all words...weird
+    "ING", "NESS", "MENT", "TION", "ITY",
+    "FUL", "LESS", "ABLE", "IBLE", "IZE", "ISE","HER"
+}
 def closed_compound_word(word: str, words_set:set[str],freq_dict) -> list[str]:
     """Return closed compound word as [start, end], or [word] if none found."""
     # try all possible splits
     for i in range(1, len(word)):
         start = word[:i]
         end = word[i:]
-
+        if end in suffixes_that_are_words or len(end) <= 2 or len(start) <=2:
+            continue # skip splits where the end is a common suffix
         if start in words_set and end in words_set:
             ##print(f"Found compound word: {word} -> {start} + {end}")
-            if freq_dict[start] > 30_000_000 and freq_dict[end] > 30_000_000:  # only accept if both parts are common words
+            frequencies = (freq_dict[start],freq_dict[end])
+            if max(frequencies) > 15_000_000 and min(frequencies) > 1_000_000:  # only accept if both parts are common words
                 return [start, end]
 
     return [word]
 
 def main()->None:
     # Example usage
-    word = "BASARA".upper()
-    hyphenation = hyphenate(word)
+    word,pronunciation = 'EVENTUALLY',['IH', 'V EH N', 'CH AH', 'W AH', 'L IY']
+    hyphenation = hyphenate(word,pronunciation)
     #print(f"Hyphenation for '{word}': {hyphenation}")
 def main_compound()->None:
     def parse_common_words(path:str)->dict:
@@ -268,7 +203,7 @@ def main_compound()->None:
     freq_dict = parse_common_words("frequency/unigram_freq.csv")
     words = set(freq_dict.keys())
     compound = closed_compound_word("HOMEOWNER", words, freq_dict)
-    #print(compound)
+    ##print(compound)
 
 if __name__ == "__main__":
     main()

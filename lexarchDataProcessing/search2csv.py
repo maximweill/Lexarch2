@@ -19,7 +19,7 @@ def json_to_csv_pronunciation(json_file: str, csv_file: str) -> None:
                     "Syllables": syll,
                     "Word": word,
                     "Frequency": freq,
-                    "Show": np.log(freq/10_000_000 + 1)
+                    "Show": np.log(freq*10 + 1)
                 })
 
     df = pd.DataFrame(rows)

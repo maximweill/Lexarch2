@@ -67,41 +67,47 @@ def main()->None:
     # Build final parallel lists
     # -----------------------------
     final_words = sorted(all_words_set)
-    compound_lists = closed_compound_words(final_words,freq_dict)
+    singles_dict,compound_dict = closed_compound_words(final_words,freq_dict)
     final_word_count = [freq_dict[w] for w in final_words]
-    final_pronunciations_syllables = [
-        [" ".join(syllable) for syllable in pronunciation_syllables(cmu_dict[word])] 
-        if len(compound_list) == 1
-        else list(
-            chain.from_iterable(
-                [" ".join(syllable) for syllable in pronunciation_syllables(cmu_dict[part])]
-                for part in compound_list
-                )
+    final_pronunciations_syllables_dict = {}
+    for word,_ in singles_dict.items():
+        final_pronunciations_syllables_dict[word] = [" ".join(syllable) for syllable in pronunciation_syllables(cmu_dict[word])]
+    for word,compound_list in compound_dict.items():
+        final_pronunciations_syllables_dict[word] = list(
+        chain.from_iterable(
+            final_pronunciations_syllables_dict[part]
+            for part in compound_list
             )
-        for word,compound_list in zip(final_words, compound_lists)
-    ]
-    final_syllables = [
-        hyphenate(word) if len(compound_list) == 1
-        else list(chain.from_iterable(hyphenate(part) for part in compound_list))
-        for word,compound_list in zip(final_words, compound_lists)
-    ]
-
-
-    output_path = "final_dataset.csv"
+        )
+    final_pronunciations_syllables = [final_pronunciations_syllables_dict[word] for word in final_words]
+    
+    final_syllables_dict = {}
+    for word,_ in singles_dict.items():
+        final_syllables_dict[word] = hyphenate(word, final_pronunciations_syllables_dict[word])
+    for word,compound_list in compound_dict.items():
+        final_syllables_dict[word] = list(
+        chain.from_iterable(
+            final_syllables_dict[part]
+            for part in compound_list
+            )
+        )
+    final_syllables = [final_syllables_dict[word] for word in final_words]
 
     df = pd.DataFrame({
         "Word": final_words,
-        #"Compound": compound_lists,
+        "Compound": [compound_dict[word] if word in compound_dict else [word] for word in final_words],
         "Pronunciation": final_pronunciations_syllables,
         "Syllables": final_syllables,
         "Frequency": final_word_count,
     })
-    df = df[df["Pronunciation"].apply(len) == df["Syllables"].apply(len)] # remove rows where lengths don't match
+    matching_length_mask = df["Pronunciation"].apply(len) == df["Syllables"].apply(len)
+    incorrect = df[~matching_length_mask] # remove rows where lengths don't match
+    correct = df[matching_length_mask] # remove rows where lengths don't match
 
-    df.to_csv(output_path, index=False, encoding="utf-8")
+    correct.to_csv("final_dataset.csv", index=False, encoding="utf-8")
+    incorrect.to_csv("incorrect_rows.csv", index=False, encoding="utf-8")
 
-    print(f"Saved {len(df)} words to {output_path}")
-    print(f"Removed {len(final_words) - len(df)} words from {output_path}")
+    print(f"Saved {len(correct)}, incorrect {len(incorrect)} rows.")
 
 
 if __name__ == "__main__":

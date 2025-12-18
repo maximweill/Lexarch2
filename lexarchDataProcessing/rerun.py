@@ -9,3 +9,4 @@ import word_difficulty
 word_difficulty.main()
 import parts
 parts.main()
+print("Generated data.")

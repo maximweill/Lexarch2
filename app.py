@@ -256,7 +256,10 @@ def server(input, output, session):
         # Get parent and child lists
         p_list, c_list = data[parent_col], data[child_col]
 
-        df_parent = search_df[search_df[parent_col].isin(p_list)].copy()
+        df_parents = [
+            search_df[search_df[parent_col] == p].nlargest(100, 'Frequency') for p in p_list
+        ]
+        df_parent = pd.concat(df_parents, ignore_index=True)
         if df_parent.empty: return px.treemap(title="Ambiguity data not available for this word, please try another.")
 
         # Compute colors for children
@@ -317,14 +320,13 @@ def server(input, output, session):
         
         if matched_df.empty: return px.treemap(title="No similar words found.")
 
-        matched_df = (
-            matched_df
-            .sort_values('Frequency', ascending=False)
-            .groupby('Signature', group_keys=False)
-            .head(30)
-        )
+        df_signatures = [
+            matched_df[matched_df['Signature'] == sig].nlargest(100, 'Frequency')
+            for sig in matched_df['Signature'].unique()
+        ]
+        matched_df = pd.concat(df_signatures, ignore_index=True)
 
-        fig = px.treemap(matched_df, path=['Signature', 'Word'], values='Frequency', color='Difficulty', color_continuous_scale='RdYlGn_r', range_color=[0, 1])
+        fig = px.treemap(matched_df, path=['Signature', 'Word'], values='Show', color='Difficulty', color_continuous_scale='RdYlGn_r', range_color=[0, 1])
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#1a1a1a', family="Lora, serif"), margin=dict(t=0, l=0, r=0, b=0))
         return fig
 
