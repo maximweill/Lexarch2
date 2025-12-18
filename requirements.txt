@@ -10,4 +10,3 @@ matplotlib
 plotly
 requests
 pyarrow
-pickle
