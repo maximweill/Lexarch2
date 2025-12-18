@@ -104,8 +104,8 @@ def main()->None:
     incorrect = df[~matching_length_mask] # remove rows where lengths don't match
     correct = df[matching_length_mask] # remove rows where lengths don't match
 
-    correct.to_csv("final_dataset.csv", index=False, encoding="utf-8")
-    incorrect.to_csv("incorrect_rows.csv", index=False, encoding="utf-8")
+    correct.to_parquet("final_dataset.parquet", index=False)
+    incorrect.to_parquet("incorrect_rows.parquet", index=False)
 
     print(f"Saved {len(correct)}, incorrect {len(incorrect)} rows.")
 

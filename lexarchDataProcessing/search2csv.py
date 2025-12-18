@@ -1,10 +1,10 @@
-import json
+import pickle
 import pandas as pd
 import numpy as np
 
-def json_to_csv_pronunciation(json_file: str, csv_file: str) -> None:
-    with open(json_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
+def dict_to_parquet_pronunciation(pkl: str, parquet_file: str) -> None:
+    with open(pkl, "rb") as f:
+        data = pickle.load(f)
     
     rows = []
     for pron, syll_dict in data.items():
@@ -23,10 +23,10 @@ def json_to_csv_pronunciation(json_file: str, csv_file: str) -> None:
                 })
 
     df = pd.DataFrame(rows)
-    df.to_csv(csv_file, index=False, encoding="utf-8")
+    df.to_parquet(parquet_file, index=False)
 
 def main():
-    json_to_csv_pronunciation("pronunciation_search.json", "search.csv")
+    dict_to_parquet_pronunciation("pronunciation_search.pkl", "search.parquet")
 
 if __name__ == "__main__":
     main()

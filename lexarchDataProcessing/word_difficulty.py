@@ -1,4 +1,4 @@
-import json
+import pickle
 import pandas as pd
 from search_datasets import load_data
 
@@ -35,15 +35,15 @@ def add_difficulty_to_df(
 
 def main()->None:
     df = load_data()
-    with open("spelling_search.json", "r", encoding="utf-8") as f:
-        spelling_search = json.load(f)
+    with open("spelling_search.pkl", "rb") as f:
+        spelling_search = pickle.load(f)
     df = add_difficulty_to_df(df, spelling_search,"Reading Difficulty",("Syllables","Pronunciation"))
 
-    with open("pronunciation_search.json", "r", encoding="utf-8") as f:
-       pronunciation_search = json.load(f)
+    with open("pronunciation_search.pkl", "rb") as f:
+       pronunciation_search = pickle.load(f)
     df = add_difficulty_to_df(df, pronunciation_search,"Spelling Difficulty",("Pronunciation","Syllables"))
 
-    df.to_csv("word_dataset_with_difficulties.csv", index=False)   
+    df.to_parquet("word_dataset_with_difficulties.parquet", index=False)   
 
 if __name__ == "__main__":
     main()

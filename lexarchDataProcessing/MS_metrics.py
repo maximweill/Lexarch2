@@ -1,26 +1,19 @@
-import numpy as np
-import json
+import pickle
 import pandas as pd
-import ast
 
 
-with open("pronunciation_search.json", "r", encoding="utf-8") as f:
-    pronunciation_search = json.load(f)
+with open("pronunciation_search.pkl", "rb") as f:
+    pronunciation_search = pickle.load(f)
 
 def load_spelling_pairs_with_syllables_data():
     """
     Load the word dataset CSV and convert string lists to actual lists.
     """
     # Path to your CSV
-    csv_file = "miss_spellings/spelling_pairs_with_syllables.csv"
+    csv_file = "miss_spellings/spelling_pairs_with_syllables.parquet"
 
     # Load CSV
-    words = pd.read_csv(csv_file)
-
-    # Convert string representations of lists into actual Python lists
-    words['Pronunciation'] = words['Pronunciation'].apply(ast.literal_eval)
-    words['True_syllables'] = words['True_syllables'].apply(ast.literal_eval)
-    words['Fake_syllables'] = words['Fake_syllables'].apply(ast.literal_eval)
+    words = pd.read_parquet(csv_file)
     # Check the DataFrame
     return words
 MS_spelling_pairs = load_spelling_pairs_with_syllables_data()
@@ -50,8 +43,7 @@ def find_incorrect_syllables():
 
 incorrect_syllables_pairs,frequency_ratios_data = find_incorrect_syllables()
 
-with open("frequency_ratios_data.json", "w", encoding="utf-8") as f:
-    json.dump(frequency_ratios_data, f, ensure_ascii=False, indent=4)
-with open("incorrect_syllables_pairs.json", "w", encoding="utf-8") as f:
-    json.dump(incorrect_syllables_pairs, f, ensure_ascii=False, indent=4)
-
+with open("frequency_ratios_data.pkl", "wb") as f:
+    pickle.dump(frequency_ratios_data, f)
+with open("incorrect_syllables_pairs.pkl", "wb") as f:
+    pickle.dump(incorrect_syllables_pairs, f)

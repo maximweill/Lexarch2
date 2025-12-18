@@ -1,10 +1,10 @@
 import pandas as pd
 
-csv_file = 'lexarchDataProcessing\word_dataset_with_difficulties.csv'
+csv_file = 'lexarchDataProcessing\word_dataset_with_difficulties.parquet'
 
 def get_similar_words(word, max_results=10):
     # Load CSV
-    df = pd.read_csv(csv_file)
+    df = pd.read_parquet(csv_file)
 
     # Normalize search case
     df['Word'] = df['Word'].astype(str)

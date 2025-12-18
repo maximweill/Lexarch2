@@ -7,7 +7,7 @@ import numpy as np
 import os
 import sys
 import random
-import json
+import pickle
 
 
 # Ensure local modules can be imported
@@ -17,16 +17,17 @@ import spelling_bee_map
 from data_processing import load_word_data, load_search_csv
 from ngram import fetch_ngram_data
 
+
 # -----------------------------------------------------------------------------
 # 1. DATA LOADING
 # -----------------------------------------------------------------------------
 #print("Loading data...")
-words_df = load_word_data("lexarchDataProcessing/word_dataset_with_difficulties.csv")
-search_df = load_search_csv("lexarchDataProcessing/search.csv").dropna()
-with open("lexarchDataProcessing/frequency_ratios_data.json","r") as f:
-     frequency_ratios = json.load(f)
+words_df = load_word_data("lexarchDataProcessing/word_dataset_with_difficulties.parquet")
+search_df = load_search_csv("lexarchDataProcessing/search.parquet").dropna()
+with open("lexarchDataProcessing/frequency_ratios_data.pkl","rb") as f:
+    frequency_ratios = pickle.load(f)
 ALL_WORDS = words_df['Word'].tolist()
-parts_df = pd.read_csv("lexarchDataProcessing/parts_database.csv")
+parts_df = pd.read_parquet("lexarchDataProcessing/parts_database.parquet")
 
 #print("Done")
 

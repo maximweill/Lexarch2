@@ -9,3 +9,5 @@ numpy
 matplotlib
 plotly
 requests
+pyarrow
+pickle

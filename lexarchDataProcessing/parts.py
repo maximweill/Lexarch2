@@ -13,8 +13,8 @@ def create_parts_database(df):
         freq = row.get('Frequency', 1)
         show = row.get('Show', 1)
         # Safe eval
-        syls = ast.literal_eval(row['Syllables']) if isinstance(row['Syllables'], str) else row['Syllables']
-        prons = ast.literal_eval(row['Pronunciation']) if isinstance(row['Pronunciation'], str) else row['Pronunciation']
+        syls = row['Syllables']
+        prons = row['Pronunciation']
         
         if len(syls) == len(prons):
             for s, p in zip(syls, prons):
@@ -23,12 +23,12 @@ def create_parts_database(df):
     return pd.DataFrame(rows, columns=['Word', 'Signature', 'Difficulty', 'Frequency', 'Show'])
 
 def main():
-    df = load_word_data("word_dataset_with_difficulties.csv")
+    df = load_word_data("word_dataset_with_difficulties.parquet")
     
     print("Creating Parts Database...")
     parts_df = create_parts_database(df)
     
-    parts_df.to_csv("parts_database.csv", index=False, encoding="utf-8")
+    parts_df.to_parquet("parts_database.parquet", index=False)
 
 if __name__ == "__main__":
     main()

@@ -1,13 +1,11 @@
 import pandas as pd
-import json
+import pickle
 from collections import defaultdict
 
 
 def load_data()->pd.DataFrame:
-    df = pd.read_csv("final_dataset.csv")
+    df = pd.read_parquet("final_dataset.parquet")
     df.dropna(inplace=True)
-    for col in ("Pronunciation", "Syllables"):
-        df[col] = df[col].apply(eval)
     
     return df
 
@@ -46,17 +44,26 @@ def spelling_search(df: pd.DataFrame)->dict[str, dict[str, list[str]]]:
             result[syll]["_total"]["_"] += frequency
 
     return result
-    
+
+def freeze(d):
+    if isinstance(d, defaultdict):
+        d = {k: freeze(v) for k, v in d.items()}
+    elif isinstance(d, dict):
+        d = {k: freeze(v) for k, v in d.items()}
+    return d
+
 def main()->None:
     df = load_data()
 
     pron_search = pronunciation_search(df)
-    with open("pronunciation_search.json", "w", encoding="utf-8") as f:
-        json.dump(pron_search, f, ensure_ascii=False, indent=4)
+    pron_search = freeze(pron_search)
+    with open("pronunciation_search.pkl", "wb") as f:
+        pickle.dump(pron_search, f)
 
     spell_search = spelling_search(df)
-    with open("spelling_search.json", "w", encoding="utf-8") as f:
-        json.dump(spell_search, f, ensure_ascii=False, indent=4)
+    spell_search = freeze(spell_search)
+    with open("spelling_search.pkl", "wb") as f:
+        pickle.dump(spell_search, f)
     
 
 

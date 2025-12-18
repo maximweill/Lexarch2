@@ -7,8 +7,8 @@ import numpy as np
 import re
 
 # --- CONFIGURATION ---
-INPUT_FILE = "final_dataset.csv"
-OUTPUT_FILE = "word_dataset_with_difficulties.csv"
+INPUT_FILE = "final_dataset.parquet"
+OUTPUT_FILE = "word_dataset_with_difficulties.parquet"
 
 # --- WEIGHTS (The recipe) ---
 # 1. Phonetic Match: How surprising is the mapping? (e.g. KN -> N)
@@ -35,17 +35,7 @@ def load_data(filename):
     if not os.path.exists(filename):
         print(f"❌ Error: {filename} not found.")
         exit()
-    df = pd.read_csv(filename)
-    
-    def parse_list(val):
-        if isinstance(val, str):
-            try: return ast.literal_eval(val)
-            except: return []
-        return val if isinstance(val, list) else []
-
-    df['Pronunciation'] = df['Pronunciation'].apply(parse_list)
-    df['Syllables'] = df['Syllables'].apply(parse_list)
-    df = df[df['Syllables'].map(len) > 0]
+    df = pd.read_parquet(filename)
     return df
 
 class LanguageModel:
@@ -170,7 +160,7 @@ def main():
     df['Spelling Difficulty'] = (s_raw - s_raw.min()) / (s_raw.max() - s_raw.min())
     
     # Save
-    df.to_csv(OUTPUT_FILE, index=False)
+    df.to_parquet(OUTPUT_FILE, index=False)
     print(f"✅ Success! Saved to {OUTPUT_FILE}")
 
     # Sanity Check

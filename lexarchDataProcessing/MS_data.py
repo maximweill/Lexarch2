@@ -6,9 +6,9 @@ def get_misspellings_df():
         raw_text += f.read()
     with open('miss_spellings/holbrook-missp.dat.txt', 'r', encoding='utf-8') as f:
         raw_text += f.read()
-    with open('miss_spellings\missp.dat.txt', 'r', encoding='utf-8') as f:
+    with open('miss_spellings/missp.dat.txt', 'r', encoding='utf-8') as f:
         raw_text += f.read()
-    with open('miss_spellings\wikipedia.dat.txt', 'r', encoding='utf-8') as f:
+    with open('miss_spellings/wikipedia.dat.txt', 'r', encoding='utf-8') as f:
         raw_text += f.read()
     raw_text = raw_text.upper()
 
@@ -28,7 +28,7 @@ def get_misspellings_df():
     print(df)
 
     # Optionally save it
-    df.to_csv('spelling_pairs.csv', index=False)
+    df.to_parquet('spelling_pairs.parquet', index=False)
 
-if __name__ == "__main__":
-    get_misspellings_df()
+
+get_misspellings_df()

@@ -1,8 +1,7 @@
 import pandas as pd
 from hyphen import Hyphenator
 from correct_hyphenation_DEPRECATED import corrected_hyph
-import ast
-MS = pd.read_csv("miss_spellings/spelling_pairs.csv")
+MS = pd.read_parquet("spelling_pairs.parquet")
 
    
 def load_word_data():
@@ -10,14 +9,10 @@ def load_word_data():
     Load the word dataset CSV and convert string lists to actual lists.
     """
     # Path to your CSV
-    csv_file = "word_dataset_with_difficulties.csv"
+    p_file = "word_dataset_with_difficulties.parquet"
 
     # Load CSV
-    words = pd.read_csv(csv_file)
-
-    # Convert string representations of lists into actual Python lists
-    words['Pronunciation'] = words['Pronunciation'].apply(ast.literal_eval)
-    words['Syllables'] = words['Syllables'].apply(ast.literal_eval)
+    words = pd.read_parquet(p_file)
     # Check the DataFrame
     return words
 word_dataset = load_word_data()
@@ -50,5 +45,5 @@ MS["Fake_syllables"] = [
 MS = MS.dropna()
 
 
-MS.to_csv("miss_spellings/spelling_pairs_with_syllables.csv", index=False)
+MS.to_parquet("miss_spellings/spelling_pairs_with_syllables.parquet", index=False)
 #print(errors)
