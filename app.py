@@ -160,7 +160,7 @@ def server(input, output, session):
 
         compound = None
         if len(data["Compound"])>1:
-            compound = ui.p(f"{" + ".join(data['Compound'])}", style="color:#666; font-style:italic;")
+            compound = ui.p(f"{' + '.join(data['Compound'])}", style="color:#666; font-style:italic;")
         
         
         mode = input.explore_mode()
