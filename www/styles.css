@@ -67,10 +67,21 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-main);
     padding: 4px 10px;
     border: 1px solid #dcd6cc;
-    margin: 0 12px 0 0; font-family: 'Georgia', serif;
+    margin: 0 1px 0 12px; font-family: 'Georgia', serif;
     font-weight: bold;
     display: inline-block;
 }
+.syllable-chip-subtitle {
+    background: transparent;
+    color: var(--text-main);
+    padding: 1px 1px;          /* slightly smaller padding */
+    margin: 0 0 0 0;
+    font-family: 'Georgia', serif;
+    font-weight: normal;       /* less bold */
+    font-size: 0.85em;         /* smaller text */
+    display: inline-block;
+}
+
 #results_container {
     animation: fadeIn 0.8s ease-out;
 }

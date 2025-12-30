@@ -7,6 +7,7 @@ import numpy as np
 import os
 import sys
 import pickle
+import text as txt
 
 
 # Ensure local modules can be imported
@@ -94,20 +95,6 @@ def server(input, output, session):
 
     @reactive.Calc
     @reactive.event(input.btn_explore)
-    def check_ambiguity_data():
-        data = get_word_data()
-        if data is None: return False
-        
-        mode = input.explore_mode()
-        parent_col = "Syllables" if mode == "Spelling" else "Pronunciation"
-        if parent_col not in search_df.columns: return False
-        
-        # Check if any rows match the parent syllables
-        df_parent = search_df[search_df[parent_col].isin(data[parent_col])]
-        return not df_parent.empty
-
-    @reactive.Calc
-    @reactive.event(input.btn_explore)
     def get_ngram_data():
         w = input.explore_word().strip().upper()
         return fetch_ngram_data(w) if w else []
@@ -121,34 +108,26 @@ def server(input, output, session):
     @render.ui
     def results_container():
         if not search_triggered.get():
-            return ui.div(
-                ui.h2("LEXARCH", style="color:#1a1a1a; font-size:5rem; opacity:0.8; font-family:'Playfair Display';"),
-                ui.p("An Architectural Exploration of Language", style="color:#595959; font-size:1.4rem; font-style:italic;"),
-                ui.hr(style="width: 100px; border-top: 2px solid #1a1a1a; margin: 30px auto;"),
-                ui.p("Select a word to begin.", style="color:#888; font-size:1rem;"),
-                style="text-align:center; padding-top: 100px;"
-            )
-        
-        show_ambiguity = check_ambiguity_data()
-        ngram_data = get_ngram_data()
+            return txt.main_page
         
         # Build Bottom Section Dynamically
         bottom_content = []
         
-        if show_ambiguity:
-            bottom_content.append(ui.h5("I. Ambiguity Mapping"))
-            bottom_content.append(output_widget("treeplot", height="500px"))
-            bottom_content.append(ui.br())
+        bottom_content.append(ui.h5("I. Ambiguity Mapping"))
+        bottom_content.append(txt.ambiguity_explanation)
+        bottom_content.append(output_widget("treeplot", height="500px"))
+        bottom_content.append(ui.br())
             
-        sim_num = "II" if show_ambiguity else "I"
-        bottom_content.append(ui.h5(f"{sim_num}. Similar Words"))
+        bottom_content.append(ui.h5(f"II. Similar Words"))
+        bottom_content.append(txt.similar_words_explanation)
         bottom_content.append(output_widget("similar_treemap", height="500px"))
         
+        ngram_data = get_ngram_data()
         if ngram_data:
             bottom_content.append(ui.br())
-            hist_num = "III" if show_ambiguity else "II"
-            bottom_content.append(ui.h5(f"{hist_num}. Historical Usage"))
+            bottom_content.append(ui.h5("III. Historical Usage"))
             bottom_content.append(output_widget("ngram_plot", height="400px"))
+
 
         return ui.div(
             ui.card(
@@ -156,7 +135,8 @@ def server(input, output, session):
                 ui.layout_columns(
                     ui.div(ui.h5("Overview"), ui.output_ui("explore_result")),
                     ui.div(
-                        ui.h5("Relevance Of Ambiguity in English Errors"), 
+                        ui.h5("Relevance of Ambiguity in English Errors"), 
+                        txt.english_errors_explanation,
                         ui.navset_tab(
                             ui.nav_panel("Distribution", output_widget("relevance_plot", height="350px")), 
                             ui.nav_panel("Proportions", output_widget("pie_plot", height="350px"))
@@ -177,20 +157,32 @@ def server(input, output, session):
         w = input.explore_word().strip().upper()
         data = get_word_data()
         if data is None: return ui.div(ui.h3(w), ui.p("Word not found."))
+
+        compound = None
+        if len(data["Compound"])>1:
+            compound = ui.p(f"{" + ".join(data['Compound'])}", style="color:#666; font-style:italic;")
+        
         
         mode = input.explore_mode()
         diff_key = 'Spelling Difficulty' if mode == "Spelling" else 'Reading Difficulty'
         diff_val = data.get(diff_key, 0)
         
         chips = data['Syllables'] if mode == "Spelling" else data['Pronunciation']
-        chips_ui = [ui.span(c, class_="syllable-chip") for c in chips]
+        chips_ui1 = [ui.span(c, class_="syllable-chip") for c in chips]
+        chips = data['Syllables'] if mode != "Spelling" else data['Pronunciation']
+        chips_ui2 = [ui.span(c, class_="syllable-chip-subtitle") for c in chips]
+
+        chips_ui = []
+        for c1, c2 in zip(chips_ui1, chips_ui2):
+            chips_ui.extend([c1, c2, " "])
 
         return ui.div(
             ui.h3(w, style="font-size: 3.5rem; color:#1a1a1a !important; text-decoration: underline; text-decoration-color: #dcd6cc;"),
+            compound,
             ui.span("VERIFIED ENTRY", style="color:#2e7d32; font-size:0.7em; font-weight:bold; letter-spacing: 1px; font-family:'Courier New';"),
             ui.br(), ui.br(),
             ui.div(
-                ui.span("DIFFICULTY INDEX: ", style="color:#595959; font-weight:bold; letter-spacing:0.05em;"),
+                ui.span(f"{mode.upper()} DIFFICULTY INDEX: ", style="color:#595959; font-weight:bold; letter-spacing:0.05em;"),
                 ui.span(f"{diff_val:.2f}", style="color:#1a1a1a; font-size:1.4em; font-weight:bold; font-family:'Georgia', serif;")
             ),
             ui.h6(f"{mode.upper()} BREAKDOWN:", style="margin-top: 25px; color: #595959 !important; font-style:italic;"),
