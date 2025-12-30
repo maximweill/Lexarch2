@@ -13,11 +13,13 @@ ambiguity_explanation = ui.div(
         The ambiguity score of a word represents the average ambiguity
         of each of it's syllables. The ambiguity representing how common
         the sound of that syllable is spelt in this way (green) relative 
-        to alternative spellings (red). If in pronunciation mode, it's how
-        common that pronunciation of that spelling is. If the green outweighs
-        red, the syllable forms the majority. if the red far outweighs the 
-        green the word should be considered very ambiguous, and care should be 
+        to alternative spellings (red). If the green outweighs the
+        red, this forms the majority and can be considered the 'rule'.
+        if the red far outweighs the 
+        green, the word should be considered very ambiguous, and care should be 
         taken when learning it's spelling.
+        If in pronunciation mode, it's how
+        common that pronunciation of that spelling is.
         """  
          , style="color:#595959; font-size:1rem; font-style:regular;"),
 
